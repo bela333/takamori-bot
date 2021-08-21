@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+
+<html>
+	<head>
+		<style type="text/css">
+			body{
+				overflow: hidden;
+				margin: 0px;
+				padding: 0px;
+			}
+			#renderSpace {
+				width: 1024px;
+				display: flex;
+				flex-direction: column;
+				padding: 30px;
+			}
+			.entry {
+				border: 1px;
+				display: block;
+				align-items: center;
+			}
+			/* yes this is correct */
+			.avatarContainerLeft {
+				display: flex;
+				justify-content: flex-end;
+				width: 220px;
+			}
+			.avatarContainerRight {
+				display: flex;
+				justify-content: flex-start;
+				width: 220px;
+			}
+			.avatarFull {
+				margin: 10px;
+				height: 100px;
+				width: 100px;
+			}
+			.avatarTable { }
+			.avatarTableEntry {
+				margin: 2px;
+				height: 50px;
+				width: 50px;
+			}
+			.entryInner {
+				align-items: center;
+			}
+			.entryInnerLeft {
+				float: left;
+				display: flex;
+				flex-direction: row;
+			}
+			.entryInnerRight {
+				float: right;
+				display: flex;
+				flex-direction: row-reverse;
+			}
+			.entryText {
+				font-size: 20px;
+				font-family: Consolas, monospace;
+				text-align: center;
+			}
+			.entryTextBold {
+				font-size: 20px;
+				font-weight: bold;
+			}
+			#renderOptions {
+				padding: 5px;
+				margin: 20px;
+				border: 1px solid black;
+				border-radius: 3px;
+				display: none;
+			}
+			.renderOption {
+				display: flex;
+				flex-direction: row;
+				width: 100%;
+			}
+			.optionLabel {
+				min-width: 125px;
+			}
+		</style>
+		<script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"></script>
+		<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+		<script>
+			const leftSide = 0;
+			const rightSide = 1;
+
+			let textWidth;
+			let maxTextWidth;
+			let verticalSeparation;
+			let horizontalSeparation;
+
+			function debounce(func, timeout = 300){
+				let timer;
+				return (...args) => {
+					clearTimeout(timer);
+					timer = setTimeout(() => { func.apply(this, args); }, timeout);
+				};
+			}
+
+			const updateSliderRender = debounce((val) => {
+				textWidth = parseInt(val);
+				let root = document.getElementById("renderSpace");
+				if (root.innerHTML !== "") {
+					runRender();
+				}
+			}, 200);
+			function updateSlider(amount) {
+				let val = document.getElementById("textWidth").value;
+				document.getElementById("textWidthDisplay").innerHTML = val + "px";
+				updateSliderRender(val);
+			}
+
+			const updateVerSeparationRender = debounce((verSeparation) => {
+				verticalSeparation = parseInt(verSeparation);
+				let root = document.getElementById("renderSpace");
+				if (root.innerHTML !== "") {
+					runRender();
+				}
+			}, 200);
+			function updateVerSeparation(amount) {
+				let verSeparation = document.getElementById("verSeparation").value;
+				document.getElementById("verSeparationDisplay").innerHTML = verSeparation + "px";
+				updateVerSeparationRender(verSeparation);
+			}
+
+			const updateHorSeparationRender = debounce((horSeparation) => {
+				horizontalSeparation = parseInt(horSeparation);
+				let root = document.getElementById("renderSpace");
+				if (root.innerHTML !== "") {
+					runRender();
+				}
+			}, 200);
+			function updateHorSeparation(amount) {
+				let horSeparation = document.getElementById("horSeparation").value;
+				document.getElementById("horSeparationDisplay").innerHTML = horSeparation + "px";
+				updateHorSeparationRender(horSeparation);
+			}
+
+			let startSide;
+
+			function updateSide(side) {
+				startSide = side;
+				let root = document.getElementById("renderSpace");
+				if (root.innerHTML !== "") {
+					runRender();
+				}
+			}
+
+			function parseInput(inp) {
+				let lines = [...(inp+"\n").matchAll(/([^\s:]* *(?:, *[^\s:]* *)*),? *: *([^\n]*)(\n+)/g)];
+				let entries = [];
+				let curSide = startSide;
+				for (line of lines) {
+					let [, name, text, ending] = line;
+					entries.push({
+						chars: name.split(",").map((x) => x.trim().toLowerCase()),
+						text,
+						side: curSide,
+					});
+					if (ending.length > 1) {
+						if (curSide === leftSide) {
+							curSide = rightSide;
+						} else {
+							curSide = leftSide;
+						}
+					}
+				}
+				return entries;
+			}
+
+			function formatText(text) {
+				let retTag = document.createElement("div")
+				retTag.className = "entryText";
+				let splitText = text.split(/(\[.+?\])/);
+				let isBold = false;
+				for (section of splitText) {
+					if (isBold) {
+						let span = document.createElement("span");
+						span.className = "entryTextBold";
+						span.appendChild(document.createTextNode(section));
+						retTag.appendChild(span);
+					} else {
+						retTag.appendChild(document.createTextNode(section));
+					}
+					isBold = !isBold;
+				}
+				return retTag;
+			}
+
+			const avatars = {
+				kiara: "https://rescrabs.github.io/takamori_comic/kiara.png",
+				calli: "https://rescrabs.github.io/takamori_comic/calli.png",
+                gawr: "https://rescrabs.github.io/takamori_comic/gawr.png",
+				gura: "https://rescrabs.github.io/takamori_comic/gura.png",
+				amelia: "https://rescrabs.github.io/takamori_comic/ame.png",
+				ame: "https://rescrabs.github.io/takamori_comic/ame.png",
+				ina: "https://rescrabs.github.io/takamori_comic/ina.png",
+				irys: "https://rescrabs.github.io/takamori_comic/irys.png",
+			}
+			function drawAvatars(characters, side) {
+				let retTag = document.createElement("div");
+				retTag.className = side === leftSide ? "avatarContainerLeft" : "avatarContainerRight";
+				let images = [];
+				for (character of characters) {
+					let img = document.createElement("img");
+					if (character === "smolame") {
+						if (side === leftSide) {
+							img.src = "https://rescrabs.github.io/takamori_comic/smolAmeLeft.png";
+						} else {
+							img.src = "https://rescrabs.github.io/takamori_comic/smolAmeRight.png";
+						}
+					} else if (avatars[character] === undefined) {
+						throw new Error("unknown character: "+character);
+					} else {
+						img.src = avatars[character];
+					}
+					images.push(img);
+				}
+				
+				switch (characters.length) {
+				case 1:
+				case 2:
+					for (img of images) {
+						img.className = "avatarFull";
+						retTag.appendChild(img);
+					}
+					break;
+				default:
+					let avatarTable = document.createElement("table");
+					avatarTable.className = "avatarTable";
+					let curRow = document.createElement("tr");
+					for (img of images) {
+						img.className = "avatarTableEntry";
+						if (curRow.childElementCount == 2) {
+							avatarTable.appendChild(curRow);
+							curRow = document.createElement("tr")
+						}
+						let wrapper = document.createElement("th");
+						wrapper.appendChild(img);
+						curRow.appendChild(wrapper);
+					}
+					avatarTable.appendChild(curRow);
+					retTag.appendChild(avatarTable);
+					break;
+				}
+				return retTag;
+			}
+
+			function compressWidth(tag) {
+				var lowerBound = 0;
+				var upperBound = textWidth;
+				var successIter = 0;
+				var iterCount = 0;
+				var noChange = true;
+
+				tag.setAttribute("style", `width: ${upperBound}px`);
+				var initHeight = tag.scrollHeight;
+
+				while (successIter < 20 && iterCount < 200) {
+					iterCount += 1;
+					var newMaxWidth = (upperBound + lowerBound) / 2;
+					tag.setAttribute("style", `width: ${newMaxWidth}px`);
+					if (tag.scrollHeight > initHeight) {
+						// cannot go lower than this
+						noChange = false;
+						lowerBound = newMaxWidth;
+					} else {
+						// can still possibly go lower
+						upperBound = newMaxWidth;
+						successIter += 1;
+					}
+				}
+				if (noChange) {
+					// cannot compress at all
+					tag.setAttribute("style", "");
+				}
+
+				return tag;
+			}
+
+			function runRender(input) {
+				if(!input){
+					input = document.getElementById("inp").value;
+				}
+				let root = document.getElementById("renderSpace");
+				root.innerHTML = "";
+				let entries = parseInput(input);
+				for (entry of entries) {
+					let entryOuter = document.createElement("div");
+					entryOuter.className = "entry";
+					entryOuter.setAttribute("style", `margin-top: ${verticalSeparation-20}px;
+													  margin-left: ${horizontalSeparation}px;
+													  margin-right: ${horizontalSeparation}px;`);
+					let entryTag = document.createElement("div");
+					entryTag.className = entry.side === leftSide ? "entryInner entryInnerLeft" : "entryInner entryInnerRight";
+					entryTag.appendChild(
+						drawAvatars(entry.chars, entry.side)
+					);
+					let textTag = formatText(entry.text)
+					entryTag.appendChild(textTag);
+					entryOuter.appendChild(entryTag);
+					root.appendChild(entryOuter);
+					compressWidth(textTag);
+				}
+			}
+
+			const updateText = debounce(runRender, 500);
+
+			window.onload = function() {
+				let textWidthTag = document.getElementById("textWidth");
+				document.getElementById("textWidthDisplay").innerHTML = textWidthTag.value + "px";
+				textWidth = parseInt(textWidthTag.value);
+				maxTextWidth = parseInt(textWidthTag.max);
+				
+				let verSeparation = document.getElementById("verSeparation").value;
+				document.getElementById("verSeparationDisplay").innerHTML = verSeparation + "px";
+				verticalSeparation = parseInt(verSeparation);
+				
+				let horSeparation = document.getElementById("horSeparation").value;
+				document.getElementById("horSeparationDisplay").innerHTML = horSeparation + "px";
+				horizontalSeparation = parseInt(horSeparation);
+				
+				startSide = document.getElementById("startSide").options.selectedIndex;
+				
+				runRender();
+			};
+
+			
+			function renderCanvas() {
+				html2canvas(document.getElementById("renderSpace")).then(function(canvas) {
+					canvas.toBlob(blob=>{
+                        let url = URL.createObjectURL(blob);
+                        window.open(url, "_blank")
+                    });
+				});
+			}
+			
+		</script>
+	</head>
+	<body>
+		<div style="display: inline-flex; flex-direction: column">
+			<textarea id="inp" rows="8" cols="50" oninput="updateText()" style="display: none;">calli, kiara: [kissy kissy gay sounds]
+kiara: excuse me, we're trying to be gay.
+
+smolame: go be gay somewhere else
+
+kiara: YOU'RE THE ONE WHO CAME IN HERE</textarea>
+
+			<div id="renderOptions">
+				<!-- <button onclick="runRender()">Run</button> -->
+				<div class="renderOption">
+					<div class="optionLabel">Text Width</div>
+					<input id="textWidth" type="range" min="50" max="500" step="1" value="250" oninput="updateSlider(this.value)">
+					<div id="textWidthDisplay"></div>
+				</div>
+				<div class="renderOption">
+					<div class="optionLabel">Vertical Separation</div>
+					<input id="verSeparation" type="range" min="0" max="200" step="1" value="20" oninput="updateVerSeparation(this.value)">
+					<div id="verSeparationDisplay"></div>
+				</div>
+				<div class="renderOption">
+					<div class="optionLabel">Horizontal Separation</div>
+					<input id="horSeparation" type="range" min="0" max="200" step="1" value="100" oninput="updateHorSeparation(this.value)">
+					<div id="horSeparationDisplay"></div>
+				</div>
+				<div class="renderOption">
+					<div class="optionLabel">Starting Side</div>
+					<select name="startSide" id="startSide" onchange="updateSide(this.options.selectedIndex)">
+						<option value="left">Left</option>
+						<option value="right">Right</option>
+					</select>
+				</div>
+			</div>
+			<button onclick="renderCanvas()" style="display: none;">Open as PNG</button>
+			<div id="renderSpace"></div>
+		</div>
+	</body>
+</html>

@@ -2,13 +2,7 @@
 
 <html>
 	<head>
-
 		<style type="text/css">
-			body{
-				overflow: hidden;
-				margin: 0px;
-				padding: 0px;
-			}
 			#renderSpace {
 				width: 1024px;
 				display: flex;
@@ -64,12 +58,14 @@
 				font-size: 20px;
 				font-weight: bold;
 			}
+            .entryCenter {
+                float: center;
+            }
 			#renderOptions {
 				padding: 5px;
 				margin: 20px;
 				border: 1px solid black;
 				border-radius: 3px;
-				display: none;
 			}
 			.renderOption {
 				display: flex;
@@ -79,10 +75,19 @@
 			.optionLabel {
 				min-width: 125px;
 			}
+			#inp, #renderOptions, button{
+				display: none;
+			}
+			body{
+				overflow: hidden;
+				margin: 0px;
+				padding: 0px;
+			}
 			.note{
 				text-align: center;
 				font-family: 'Courier New', Courier, monospace;
 			}
+			
 		</style>
 		<script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"></script>
 		<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
@@ -153,13 +158,15 @@
 			}
 
 			function parseInput(inp) {
-				let lines = [...(inp+"\n").matchAll(/([^\s:]* *(?:, *[^\s:]* *)*),? *: *([^\n]*)(\n+)/g)];
+				let lines = [...(inp+"\n").matchAll(/(([^\s:]* *(?:, *[^\s:]* *)*),? *: *)?([^\n]*)(\n+)/g)];
 				let entries = [];
 				let curSide = startSide;
 				for (line of lines) {
-					let [, name, text, ending] = line;
+					let [, , names, text, ending] = line;
 					entries.push({
-						chars: name.split(",").map((x) => x.trim().toLowerCase()),
+						chars: names == null
+                            ? null
+                            : names.split(",").map(x => x.trim().toLowerCase()).filter(x => x !== ""),
 						text,
 						side: curSide,
 					});
@@ -194,14 +201,16 @@
 			}
 
 			const avatars = {
-				kiara: "https://rescrabs.github.io/takamori_comic/kiara.png",
-				calli: "https://rescrabs.github.io/takamori_comic/calli.png",
-                gawr: "https://rescrabs.github.io/takamori_comic/gawr.png",
-				gura: "https://rescrabs.github.io/takamori_comic/gura.png",
-				amelia: "https://rescrabs.github.io/takamori_comic/ame.png",
-				ame: "https://rescrabs.github.io/takamori_comic/ame.png",
-				ina: "https://rescrabs.github.io/takamori_comic/ina.png",
-				irys: "https://rescrabs.github.io/takamori_comic/irys.png",
+				kiara: "kiara.png",
+				calli: "calli.png",
+                gawr: "gawr.png",
+				gura: "gura.png",
+				amelia: "ame.png",
+				ame: "ame.png",
+				ina: "ina.png",
+				irys: "irys.png",
+                yagoo: "yagoo.jpg",
+                yagoosad: "yagoosad.jpg"
 			}
 			function drawAvatars(characters, side) {
 				let retTag = document.createElement("div");
@@ -211,9 +220,9 @@
 					let img = document.createElement("img");
 					if (character === "smolame") {
 						if (side === leftSide) {
-							img.src = "https://rescrabs.github.io/takamori_comic/smolAmeLeft.png";
+							img.src = "smolAmeLeft.png";
 						} else {
-							img.src = "https://rescrabs.github.io/takamori_comic/smolAmeRight.png";
+							img.src = "smolAmeRight.png";
 						}
 					} else if (avatars[character] === undefined) {
 						throw new Error("unknown character: "+character);
@@ -224,6 +233,7 @@
 				}
 				
 				switch (characters.length) {
+                case 0:
 				case 1:
 				case 2:
 					for (img of images) {
@@ -284,19 +294,34 @@
 				return tag;
 			}
 
+            function renderCenterText(root, text) {
+                let entry = document.createElement("div");
+                entry.className = "centerEntry";
+                entry.setAttribute("style", `margin-top: ${verticalSeparation+20}px;
+                                             margin-bottom: ${verticalSeparation+20}px;`);
+                entry.appendChild(formatText(text));
+				root.appendChild(entry);
+            }
+
 			function runRender(input) {
 				if(!input){
-					input = document.getElementById("inp").value;
+					input=document.getElementById("inp").value;
 				}
 				let root = document.getElementById("renderSpace");
 				root.innerHTML = "";
+				let sideSep = document.getElementById("horSeparation").max - horizontalSeparation;
 				let entries = parseInput(input);
 				for (entry of entries) {
+                    if (entry.chars == null) {
+                        // center text
+                        renderCenterText(root, entry.text);
+                        continue;
+                    }
 					let entryOuter = document.createElement("div");
 					entryOuter.className = "entry";
 					entryOuter.setAttribute("style", `margin-top: ${verticalSeparation-20}px;
-													  margin-left: ${horizontalSeparation}px;
-													  margin-right: ${horizontalSeparation}px;`);
+													  margin-left: ${sideSep}px;
+													  margin-right: ${sideSep}px;`);
 					let entryTag = document.createElement("div");
 					entryTag.className = entry.side === leftSide ? "entryInner entryInnerLeft" : "entryInner entryInnerRight";
 					entryTag.appendChild(
@@ -312,7 +337,43 @@
 
 			const updateText = debounce(runRender, 500);
 
+			function parseHash(hash){
+				if (!hash) {
+					return;
+				}
+				try {
+					let data = JSON.parse(atob(decodeURIComponent(hash.substring(1))));
+					if (data.text && data.width && data.v && data.h && data.side) {
+						document.getElementById("inp").value = data.text;
+						document.getElementById("textWidth").value = data.width;
+						document.getElementById("verSeparation").value = data.v;
+						document.getElementById("horSeparation").value = data.h;
+						document.getElementById("startSide").value = data.side;
+					}
+				}catch(_){
+					alert("Invalid URL");
+				}
+			}
+
+			function updateHash(){
+				let data = {
+					text: document.getElementById("inp").value,
+					width: document.getElementById("textWidth").value,
+					v: document.getElementById("verSeparation").value,
+					h: document.getElementById("horSeparation").value,
+					side: document.getElementById("startSide").value,
+				}
+				location.hash = "#"+encodeURIComponent(btoa(JSON.stringify(data)));
+				if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+					navigator.clipboard.writeText(location);
+					alert("Copied link to clipboard!");
+				}else{
+					prompt("Link: ", location)
+				}
+			}
+
 			window.onload = function() {
+				parseHash(location.hash);
 				let textWidthTag = document.getElementById("textWidth");
 				document.getElementById("textWidthDisplay").innerHTML = textWidthTag.value + "px";
 				textWidth = parseInt(textWidthTag.value);
@@ -333,11 +394,14 @@
 
 			
 			function renderCanvas() {
+				let w = window.open();
 				html2canvas(document.getElementById("renderSpace")).then(function(canvas) {
 					canvas.toBlob(blob=>{
-                        let url = URL.createObjectURL(blob);
-                        window.open(url, "_blank")
-                    });
+						let url = URL.createObjectURL(blob);
+						w.location = url;
+					});
+				}).catch(function(){
+					w.close();
 				});
 			}
 			
@@ -345,7 +409,7 @@
 	</head>
 	<body>
 		<div style="display: inline-flex; flex-direction: column">
-			<textarea id="inp" rows="8" cols="50" oninput="updateText()" style="display: none;">calli, kiara: [kissy kissy gay sounds]
+			<textarea id="inp" rows="8" cols="50" oninput="updateText()">calli, kiara: [kissy kissy gay sounds]
 kiara: excuse me, we're trying to be gay.
 
 smolame: go be gay somewhere else
@@ -377,7 +441,8 @@ kiara: YOU'RE THE ONE WHO CAME IN HERE</textarea>
 					</select>
 				</div>
 			</div>
-			<button onclick="renderCanvas()" style="display: none;">Open as PNG</button>
+			<button onclick="renderCanvas()">Open as PNG</button>
+			<button onclick="updateHash()">Get link</button>
 			<div id="crop">
 				<div class="note">
 					This comic was generated by an AI, uploaded by a human

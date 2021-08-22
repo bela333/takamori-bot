@@ -3,7 +3,7 @@ import os
 from PIL import Image
 import io
 
-def upload(image, reply_message):
+def upload(image):
     auth = tweepy.OAuthHandler(os.environ.get("TWITTER_KEY"), os.environ.get("TWITTER_SECRET"))
     auth.set_access_token(os.environ.get("TWITTER_TOKEN"), os.environ.get("TWITTER_TOKEN_SECRET"))
     api = tweepy.API(auth)

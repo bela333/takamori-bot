@@ -3,6 +3,8 @@ import tweet
 #import base64
 #from urllib.parse import quote
 from PIL import Image
+from dotenv import load_dotenv, find_dotenv
+load_dotenv(find_dotenv())
 
 #link_data = {
 #    "text":text,

@@ -20,7 +20,7 @@ def render(text):
     driver.execute_script("updateText(arguments[0])", text)
     time.sleep(2)
 
-    render_space = driver.find_element_by_id("renderSpace")
+    render_space = driver.find_element_by_id("crop")
 
     driver.set_window_size(render_space.size["width"], render_space.size["height"])
 

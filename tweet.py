@@ -14,4 +14,4 @@ def upload(image, reply_message):
 
     media = api.media_upload("image.png", file=b)
     status = api.update_status(media_ids=[media.media_id])
-    api.update_status(status=reply_message, in_reply_to_status_id=status.id)
+    #api.update_status(status=reply_message, in_reply_to_status_id=status.id)

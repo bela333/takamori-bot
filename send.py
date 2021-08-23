@@ -18,4 +18,4 @@ load_dotenv(find_dotenv())
 #link_data = quote(link_data)
 #link = "https://rescrabs.github.io/takamori_comic/#"+link_data
 image = Image.open("image.png")
-tweet.upload(image)
+tweet.upload(image, "#takamori")
